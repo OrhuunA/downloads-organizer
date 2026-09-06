@@ -303,6 +303,11 @@ dokunmaz.
 - Çok büyük dosyalarda (birkaç GB) indirme bitmeden `stability_check_seconds`
   süresi dolabilir; gerekirse bu değeri `config.yaml`'da artırabilirsiniz.
 
+## Lisans
+
+Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır — dilediğiniz gibi
+kullanabilir, değiştirebilir ve paylaşabilirsiniz.
+
 ---
 
 # Downloads Folder Auto-Organizer (English)
@@ -598,3 +603,8 @@ your real files.
 - For very large files (several GB), the `stability_check_seconds`
   window might elapse before the download finishes; increase that
   value in `config.yaml` if needed.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) — use,
+modify, and share it freely.
