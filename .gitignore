@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# App-generated / user-specific state (don't commit someone's own logs)
+.organizer_log.txt
+*.organizer_log.txt
+
+# OS cruft
+.DS_Store
+Thumbs.db

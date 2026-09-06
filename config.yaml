@@ -1,0 +1,214 @@
+# =============================================================
+# İndirilenler Klasörü Otomatik Düzenleyici - Kural Dosyası
+# Downloads Folder Auto-Organizer - Rules File
+# =============================================================
+# Bu dosyayı düzenleyerek kuralları istediğiniz gibi değiştirebilirsiniz.
+# Programı yeniden başlatmanıza gerek yok: sistem tepsisi menüsünden
+# "Kuralları Yeniden Yükle" seçeneğine tıklamanız yeterli.
+#
+# Edit this file to change the rules however you like. You don't need
+# to restart the program: click "Reload Rules" in the tray menu instead.
+#
+# ÖNEMLİ: Girinti (satır başındaki boşluklar) YAML'de anlamlıdır,
+# bir editörle (VS Code, Notepad++ vb.) düzenlemeniz önerilir.
+# IMPORTANT: indentation matters in YAML — edit with a text/code editor
+# (VS Code, Notepad++, etc.).
+
+# Uygulama arayüzünün dili: "tr" (Türkçe) veya "en" (English).
+# Bu ayar; tepsi menüsünü, bildirim/log mesajlarını ve konsol
+# çıktısını etkiler. Aşağıdaki kural adlarını (name) hem Türkçe hem
+# İngilizce yazdık, böylece hangi dili seçerseniz seçin loglarda
+# anlaşılır görünürler.
+#
+# Interface language: "tr" (Turkish) or "en" (English). This affects
+# the tray menu, log/notification messages and console output. The
+# default rule names below are written bilingually (Turkish / English)
+# so they stay readable no matter which language you pick.
+language: "tr"
+
+# "Ayarlar" penceresinin görünüm teması: "auto" (işletim sisteminin
+# açık/koyu tema ayarını izler), "light" (açık) ya da "dark" (koyu).
+# Ayarlar penceresindeki tema düğmesiyle de değiştirilebilir.
+#
+# Appearance theme for the "Settings" window: "auto" (follows your
+# operating system's light/dark setting), "light", or "dark". Can also
+# be changed with the theme button inside the Settings window itself.
+ui_theme: "auto"
+
+# İzlenecek klasör. "~" kullanıcı ana klasörünüzü ifade eder.
+# Folder to watch. "~" means your home/user folder.
+watch_folder: "~/Downloads"
+
+# Bu uzantılara sahip dosyalar TAMAMEN YOK SAYILIR (henüz indirme
+# tamamlanmamış geçici dosyalar). Tarayıcılar indirme bitene kadar
+# bu tür uzantılar kullanır.
+ignore_extensions:
+  - ".crdownload"   # Chrome/Edge indirme sırasında
+  - ".part"         # Firefox indirme sırasında
+  - ".partial"
+  - ".tmp"
+  - ".download"     # Safari indirme sırasında
+  - ".opdownload"   # Opera
+
+# Bir dosyanın "indirme bitti, taşınabilir" sayılması için boyutunun
+# kaç saniye değişmeden sabit kalması gerektiği.
+stability_check_seconds: 2
+
+# Dosya her kontrol edildiğinde ne kadar beklensin (saniye).
+poll_interval_seconds: 1
+
+# -------------------------------------------------------------
+# KURALLAR
+# -------------------------------------------------------------
+# Kurallar YUKARIDAN AŞAĞIYA sırayla kontrol edilir ve İLK UYAN
+# kural uygulanır. Bu yüzden daha özel/dar kapsamlı kuralları
+# (ör. "fatura" gibi isim eşleşmeleri) üste, daha genel kuralları
+# (ör. tüm resimler) alta koymak mantıklıdır.
+#
+# Her kuralın alanları:
+#   name              : Kuralın adı (sadece loglarda görünür)
+#   match.extensions  : Bu uzantılardan biriyle bitiyorsa eşleşir
+#   match.name_contains: Dosya adında bu kelimelerden biri geçiyorsa eşleşir
+#                        (büyük/küçük harf duyarsız)
+#   match.regex       : Dosya adı bu regex ile eşleşiyorsa eşleşir (opsiyonel)
+#   match.older_than_days: Dosyanın değiştirilme tarihi bu kadar günden
+#                        eskiyse eşleşir (arşivleme kuralları için)
+#   destination       : Dosyanın taşınacağı klasör. Şu yer tutucular
+#                        kullanılabilir: {year} {month} {month_name} {day}
+#                        (dosyanın değiştirilme tarihine göre doldurulur)
+#
+# Bir kuralda match.extensions, match.name_contains, match.regex ve
+# match.older_than_days alanlarından BİRDEN FAZLASI varsa, HEPSİNİN
+# doğru olması gerekir (VE mantığı).
+
+rules:
+  # --- İsme göre özel kurallar (üstte, çünkü daha spesifik) ---
+  # --- Name-based rules first (more specific, so they win first) ---
+  - name: "Faturalar ve Makbuzlar / Invoices & Receipts"
+    match:
+      name_contains: ["fatura", "invoice", "receipt", "makbuz"]
+    destination: "~/Downloads/Belgeler/Faturalar"
+
+  - name: "Ekran Görüntüleri / Screenshots"
+    match:
+      name_contains: ["screenshot", "ekran görüntüsü", "ekran goruntusu", "screen shot"]
+    destination: "~/Downloads/Resimler/Ekran Görüntüleri"
+
+  # --- Uzantıya göre genel kategoriler ---
+  # --- General categories, matched by file extension ---
+  - name: "Resimler / Images"
+    match:
+      extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".bmp", ".svg", ".tiff"]
+    destination: "~/Downloads/Resimler"
+
+  - name: "Belgeler / Documents"
+    match:
+      extensions: [".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt", ".md"]
+    destination: "~/Downloads/Belgeler"
+
+  - name: "Tablolar ve Sunumlar / Spreadsheets & Presentations"
+    match:
+      extensions: [".xlsx", ".xls", ".csv", ".pptx", ".ppt", ".key", ".numbers"]
+    destination: "~/Downloads/Belgeler/Ofis Dosyaları"
+
+  - name: "Yazılımlar ve Kurulum Dosyaları / Software & Installers"
+    match:
+      extensions: [".exe", ".msi", ".dmg", ".pkg", ".deb", ".rpm", ".appimage"]
+    destination: "~/Downloads/Yazılımlar"
+
+  - name: "Arşivler / Archives"
+    match:
+      extensions: [".zip", ".rar", ".7z", ".tar", ".gz", ".tar.gz", ".bz2"]
+    destination: "~/Downloads/Arşivler"
+
+  # Müzik parçaları + tüm diğer ses kayıtları (podcast, sesli not,
+  # zil sesi, ses efekti vb.) tek bir kategoride toplanır.
+  # Music tracks + every other kind of audio (podcasts, voice memos,
+  # ringtones, sound effects, etc.) are grouped into one category.
+  - name: "Müzik ve Sesler / Music & Sounds"
+    match:
+      extensions:
+        - ".mp3"
+        - ".wav"
+        - ".flac"
+        - ".aac"
+        - ".m4a"
+        - ".ogg"
+        - ".opus"
+        - ".wma"
+        - ".aiff"
+        - ".alac"
+        - ".mid"
+        - ".midi"
+        - ".amr"
+        - ".caf"
+        - ".3gp"
+    destination: "~/Downloads/Müzik ve Sesler"
+
+  - name: "Videolar / Videos"
+    match:
+      extensions: [".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv"]
+    destination: "~/Downloads/Videolar"
+
+  - name: "Kod ve Veri Dosyaları / Code & Data Files"
+    match:
+      extensions: [".json", ".xml", ".yaml", ".yml", ".py", ".js", ".ts", ".html", ".css", ".sql"]
+    destination: "~/Downloads/Kod"
+
+  # --- Tarihe göre arşivleme örneği (isteğe bağlı, varsayılan kapalı) ---
+  # --- Date-based archiving example (optional, disabled by default) ---
+  # 90 günden eski, yukarıdaki hiçbir kurala uymayan dosyaları
+  # yıl/ay klasörlerine arşivlemek isterseniz bu kuralı aktif edebilirsiniz.
+  # Enable this to archive files older than 90 days (that matched no
+  # rule above) into year-month folders.
+  # - name: "Eski Dosyaları Arşivle / Archive Old Files"
+  #   match:
+  #     older_than_days: 90
+  #   destination: "~/Downloads/Arşiv/{year}-{month}"
+
+# Yukarıdaki kuralların hiçbiriyle eşleşmeyen dosyalar buraya taşınır.
+# Hiçbir yere taşınmasını istemiyorsanız (dosya olduğu yerde kalsın)
+# bu satırı boş bırakabilir veya "null" yapabilirsiniz.
+#
+# Files that match none of the rules above go here. Leave this blank
+# or set it to "null" if you'd rather leave unmatched files in place.
+default_destination: "~/Downloads/Diğer"
+
+# Log dosyasının konumu.
+# Location of the log file.
+log_file: "~/Downloads/.organizer_log.txt"
+
+# -------------------------------------------------------------
+# KLASÖRLERİ DÜZENLEME (opsiyonel, varsayılan KAPALI)
+# ORGANIZING FOLDERS (optional, disabled by default)
+# -------------------------------------------------------------
+# Downloads klasörünüzün kökünde duran KLASÖRLERİ de (yalnızca
+# dosyaları değil) düzenlemek isterseniz bunu "true" yapın.
+#
+# GÜVENLİK NOTU: Programın kendi oluşturduğu kategori klasörleri
+# (Resimler, Belgeler, Arşivler, Müzik ve Sesler, Diğer, Klasörler,
+# vb. — yani yukarıdaki tüm "destination" değerlerinin üst klasörleri)
+# HER ZAMAN otomatik olarak korunur ve asla taşınmaz. Bu sayede
+# "Klasörler'i bir yere taşı, oradan bir yere daha taşı" gibi sonsuz
+# bir iç içe geçme/döngü YAŞANMAZ — program başlarken bu korunan
+# listeyi kendisi hesaplar. Siz sadece kendi indirdiğiniz veya masaüstü
+# programlarının oluşturduğu diğer klasörleri (proje klasörleri,
+# oyun modu klasörleri vb.) etkilersiniz.
+#
+# Set this to "true" to also organize FOLDERS (not just files) sitting
+# directly in your Downloads folder.
+#
+# SAFETY NOTE: the app's own category folders (Images, Documents,
+# Archives, Music & Sounds, Other, Folders, etc. — i.e. the top-level
+# parent of every "destination" above) are ALWAYS automatically
+# protected and never moved. This is what prevents an infinite
+# nested-reorganization loop ("move Folders somewhere, then move that
+# somewhere else...") — the app computes this protected list itself on
+# startup. You only affect other folders you downloaded or that other
+# apps created (project folders, game mod folders, etc.).
+organize_folders: false
+
+# organize_folders "true" iken, eşleşmeyen (kategorisi olmayan)
+# klasörlerin taşınacağı yer.
+# Where non-matching folders go when organize_folders is "true".
+folders_destination: "~/Downloads/Klasörler"
