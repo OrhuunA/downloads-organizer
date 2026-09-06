@@ -107,21 +107,22 @@ davranışa otomatik olarak geri döner.)
 
 Bu programı başka insanlara (arkadaşlarınıza, iş arkadaşlarınıza) da
 kullandırmak istiyorsanız, onların Python kurmasına, `pip install`
-veya `cmd` kullanmasına HİÇ gerek kalmadan çalışan, **tek bir .exe
-dosyası** oluşturabilirsiniz:
+veya `cmd` kullanmasına HİÇ gerek kalmadan çalışan bir **.exe**
+oluşturabilirsiniz:
 
 1. Bu klasörde `build_exe.bat` dosyasına **çift tıklayın** (ya da bir
    `cmd` penceresinde `build_exe.bat` yazıp Enter'a basın). Bir kaç
    dakika sürebilir; gerekli `pyinstaller` paketini kendisi kurar.
-2. İşlem bitince `dist\IndirilenlerDuzenleyici.exe` dosyası oluşur.
-3. Bu **tek dosyayı** (USB, e-posta, WhatsApp, Google Drive vb. ile)
-   istediğiniz kişiye gönderin.
+2. İşlem bitince `dist\IndirilenlerDuzenleyici\` klasörü ve içinde
+   `IndirilenlerDuzenleyici.exe` oluşur.
+3. Bu **klasörün tamamını** zip'leyip (USB, e-posta, WhatsApp, Google
+   Drive vb. ile) istediğiniz kişiye gönderin.
 
-Alıcı tarafta yapılması gereken tek şey: dosyayı istedikleri bir
-klasöre koyup çift tıklamak. Program ilk açılışta, o klasörün içine
-kendi `config.yaml` dosyasını otomatik olarak oluşturur (varsayılan
-kurallarla) ve çalışmaya başlar — Python kurulu olması bile gerekmez,
-çünkü .exe içine gömülüdür. Sonraki her açılışta aynı klasördeki
+Alıcı tarafta yapılması gereken tek şey: zip'i açıp klasördeki
+`IndirilenlerDuzenleyici.exe`'ye çift tıklamak. Program ilk açılışta,
+o klasörün içine kendi `config.yaml` dosyasını otomatik olarak
+oluşturur (varsayılan kurallarla) ve çalışmaya başlar — Python kurulu
+olması bile gerekmez. Sonraki her açılışta aynı klasördeki
 `config.yaml`'ı kullanır, yani "Ayarlar" penceresinden yaptıkları
 değişiklikler kalıcı olur.
 
@@ -129,6 +130,43 @@ Bu .exe'yi kendi bilgisayarınızda da, Python kurulumuyla uğraşmak
 yerine doğrudan kullanmaya devam edebilirsiniz — kaynak koddan
 (`python tray_app.py`) çalıştırmakla tamamen aynı şekilde davranır,
 sadece dağıtımı çok daha kolaydır.
+
+**Önemli:** `.exe`'yi klasöründen ayırıp tek başına taşımayın/paylaşmayın
+— yanındaki `_internal` klasörüne ihtiyacı var, o olmadan açılmaz.
+Paylaşırken her zaman `IndirilenlerDuzenleyici` klasörünün tamamını
+zip'leyin (nedeni bir alttaki bölümde).
+
+### Antivirüs / Windows Defender / Chrome uyarıları
+
+PyInstaller ile paketlenmiş `.exe` dosyaları — özellikle eskiden
+kullandığımız **tek dosyalık ("--onefile")** paketleme biçiminde —
+Windows Defender, Chrome'un "Tehlikeli dosya" uyarısı ve Google Safe
+Browsing tarafından **yanlış alarm (false positive)** ile sıkça
+"zararlı yazılım" olarak işaretlenip otomatik siliniyor. Bunun sebebi
+kodun kötü niyetli olması değil: tek-dosya modu, program çalışırken
+kendini gizlice bir geçici klasöre açıyor, ve bu davranış tam olarak
+zararlı yazılım "dropper"larının kullandığı yönteme benziyor —
+antivirüs yazılımları da bu yüzden şüpheleniyor. Bu, PyInstaller
+kullanan hemen hemen tüm projelerde yıllardır bilinen, yaygın bir
+sorun.
+
+Bunu azaltmak için `build_exe.bat` artık **`--onedir`** (tek dosya
+yerine klasör) ve **`--noupx`** (sıkıştırma kapalı) seçenekleriyle
+derliyor — ikisi de yanlış alarm oranını ciddi şekilde düşürüyor,
+çünkü artık gizli bir kendi kendine açılma davranışı yok. Yine de
+%100 garanti değildir; hâlâ bir uyarı görürseniz:
+
+- **Google'a yanlış pozitif bildirin:**
+  https://safebrowsing.google.com/safebrowsing/report_error/
+- **Microsoft'a bildirin:**
+  https://www.microsoft.com/en-us/wdsi/filesubmission
+  (genelde birkaç gün içinde inceleyip düzeltiyorlar)
+- Kalıcı/en sağlam çözüm **kod imzalama (code signing)** — ücretli bir
+  sertifika veya açık kaynak projeler için SignPath gibi ücretsiz
+  seçenekler mevcut, ama bu şart değildir.
+- Doğrudan kaynak koddan çalıştırmak (`python tray_app.py`) hiçbir
+  zaman bu tür bir uyarıya takılmaz, çünkü ortada paketlenmiş bir
+  `.exe` yoktur.
 
 ## Dil (Türkçe / İngilizce)
 
@@ -421,21 +459,58 @@ You can package it into a **single .exe file**:
 1. Double-click `build_exe.bat` in this folder (or run it from a
    `cmd` window). It takes a couple of minutes and installs
    `pyinstaller` on its own if needed.
-2. When it finishes, `dist\IndirilenlerDuzenleyici.exe` is ready.
-3. Send that **one file** to anyone (USB drive, email, cloud drive,
-   whatever) you want to share it with.
+2. When it finishes, the `dist\IndirilenlerDuzenleyici\` folder is
+   ready, containing `IndirilenlerDuzenleyici.exe`.
+3. Zip up **that whole folder** and send it (USB drive, email, cloud
+   drive, whatever) to anyone you want to share it with.
 
-All the recipient has to do is put it in a folder and double-click
-it. On first run, the app creates its own `config.yaml` right next to
-itself (with the default rules) and starts working — they don't even
-need Python installed, since everything is bundled into the .exe.
-Every later run reuses that same `config.yaml`, so any changes made
-through the Settings window are kept.
+All the recipient has to do is unzip it and double-click
+`IndirilenlerDuzenleyici.exe` inside. On first run, the app creates
+its own `config.yaml` right next to itself (with the default rules)
+and starts working — they don't even need Python installed. Every
+later run reuses that same `config.yaml`, so any changes made through
+the Settings window are kept.
 
 You can keep using this .exe on your own computer too, instead of
 dealing with a Python install — it behaves exactly like running from
 source (`python tray_app.py`), it's just much easier to hand to
 someone else.
+
+**Important:** don't move or share the `.exe` by itself, separated
+from its folder — it needs the `_internal` folder next to it to run.
+Always zip up the whole `IndirilenlerDuzenleyici` folder (see why in
+the next section).
+
+### Antivirus / Windows Defender / Chrome warnings
+
+`.exe` files packaged with PyInstaller — especially with the
+**single-file ("--onefile")** mode we used to use — are frequently
+flagged as "malware" and auto-deleted by Windows Defender, Chrome's
+"Dangerous file" warning, and Google Safe Browsing, as a **false
+positive**. This isn't because the code is malicious: single-file
+mode silently unpacks itself into a temporary folder at runtime, and
+that behavior looks a lot like what malware "droppers" do — so
+antivirus software gets suspicious. This is a common, years-long,
+well-documented issue with pretty much every PyInstaller-based
+project, not something specific to this app.
+
+To reduce it, `build_exe.bat` now builds with **`--onedir`** (a
+folder instead of a single file) and **`--noupx`** (compression
+disabled) — both meaningfully lower the false-positive rate, since
+there's no more hidden self-extraction. It's not a 100% guarantee
+though; if you still see a warning:
+
+- **Report the false positive to Google:**
+  https://safebrowsing.google.com/safebrowsing/report_error/
+- **Report it to Microsoft:**
+  https://www.microsoft.com/en-us/wdsi/filesubmission
+  (usually reviewed and fixed within a few days)
+- The most durable fix is **code signing** — a paid certificate, or
+  free options like SignPath for open-source projects — but it's not
+  required.
+- Running straight from source (`python tray_app.py`) never triggers
+  this kind of warning at all, since there's no packaged `.exe`
+  involved.
 
 ## Language (Turkish / English)
 
