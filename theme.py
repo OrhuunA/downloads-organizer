@@ -15,8 +15,9 @@ platforms default to "light").
 
 from __future__ import annotations
 
-import platform
 from tkinter import ttk
+
+from platform_backend import backend
 
 MODES = ("auto", "light", "dark")
 
@@ -64,33 +65,12 @@ _PALETTES = {
 
 def detect_system_theme() -> str:
     """Isletim sisteminin acik/koyu tema tercihini tespit etmeye calisir.
-    Basarisiz olursa ya da platform desteklenmiyorsa "light" doner."""
-    if platform.system() == "Windows":
-        try:
-            import winreg
-
-            key_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                return "light" if value else "dark"
-        except Exception:
-            return "light"
-    if platform.system() == "Darwin":
-        try:
-            import subprocess
-
-            result = subprocess.run(
-                ["defaults", "read", "-g", "AppleInterfaceStyle"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            if result.returncode == 0 and "dark" in result.stdout.strip().lower():
-                return "dark"
-            return "light"
-        except Exception:
-            return "light"
-    return "light"
+    Basarisiz olursa ya da platform desteklenmiyorsa "light" doner.
+    (Platforma ozel tespit mantigi artik platform_backend paketinde.)"""
+    try:
+        return backend.detect_system_theme()
+    except Exception:
+        return "light"
 
 
 def resolve_mode(preference: str) -> str:

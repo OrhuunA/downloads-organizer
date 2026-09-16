@@ -31,10 +31,8 @@ from __future__ import annotations
 
 import os
 import platform
-import subprocess
 import sys
 import threading
-import webbrowser
 from pathlib import Path
 
 import pystray
@@ -42,6 +40,7 @@ from PIL import Image, ImageDraw
 
 from organizer import OrganizerService, DEFAULT_CONFIG_PATH, ensure_config_exists
 from i18n import t
+from platform_backend import backend
 import autostart
 
 try:
@@ -53,27 +52,9 @@ except ImportError:
 
 
 def open_path(path: Path):
-    """Isletim sistemine gore bir dosyayi/klasoru varsayilan uygulamada acar."""
-    path = Path(path)
-    try:
-        if not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            if not path.exists() and path.suffix:
-                path.touch()
-        system = platform.system()
-        if system == "Windows":
-            import os
-            os.startfile(str(path))  # type: ignore[attr-defined]
-        elif system == "Darwin":
-            subprocess.Popen(["open", str(path)])
-        else:
-            subprocess.Popen(["xdg-open", str(path)])
-    except Exception:
-        # Son çare: tarayıcı/varsayılan handler ile dene
-        try:
-            webbrowser.open(path.as_uri())
-        except Exception:
-            pass
+    """Isletim sistemine gore bir dosyayi/klasoru varsayilan uygulamada acar.
+    (Platforma ozel acma mantigi artik platform_backend paketinde.)"""
+    backend.open_path(Path(path))
 
 
 def make_icon_image(paused: bool = False) -> Image.Image:
@@ -102,8 +83,11 @@ class TrayApplication:
     def __init__(self):
         self.service = OrganizerService(DEFAULT_CONFIG_PATH)
         self.icon: pystray.Icon | None = None
-        self.root = None  # tkinter kok penceresi (run() icinde olusturulur)
+        self.root = None  # tkinter kok penceresi (run() icinde olusturulur;
+        # macOS'ta persistent bir root OLUSTURULMAZ, bkz. run())
         self._settings_window = None
+        self._settings_thread = None  # macOS'ta Ayarlar penceresi icin
+        # kullanilan, istek uzerine olusturulan kisa omurlu thread
 
     # ---- menu callbacks -------------------------------------------------
 
@@ -112,14 +96,71 @@ class TrayApplication:
         self._refresh_icon()
 
     def _open_settings(self, icon, item):
-        if tk is None or self.root is None:
+        if tk is None:
             # tkinter yoksa eski davranisa (YAML dosyasini editorde acmak) don
             self._open_rules(icon, item)
             return
-        # pystray'in olay dongusu (thread) ile tkinter'in kendi ana thread'i
-        # ayri oldugu icin, pencereyi tkinter'in kendi thread'inde acmak
-        # icin root.after(...) ile "havale" ediyoruz.
-        self.root.after(0, self._show_settings_window)
+        if self.root is not None:
+            # Windows/Linux: persistent (gizli) bir root var. pystray'in
+            # olay dongusu (thread) ile tkinter'in kendi ana thread'i ayri
+            # oldugu icin, pencereyi tkinter'in kendi thread'inde acmak
+            # icin root.after(...) ile "havale" ediyoruz.
+            self.root.after(0, self._show_settings_window)
+        else:
+            # macOS: persistent bir root yok (bkz. run() / platform_backend
+            # /macos.py::run_app'teki aciklama) -- Ayarlar penceresini
+            # istek uzerine, ayri bir thread'de aciyoruz.
+            self._show_settings_window_macos_on_demand()
+
+    def _show_settings_window_macos_on_demand(self):
+        """macOS icin: pystray ana thread'i kullandigindan, sureki acik
+        bir tkinter kok penceresi tutamayiz. Bunun yerine, Ayarlar
+        penceresi her istendiginde KISA OMURLU, kendi `tk.Tk()` koku olan
+        ayri bir arka plan thread'i olusturuyoruz; pencere kapaninca o
+        thread de sona eriyor.
+
+        For macOS: since pystray owns the main thread, we can't keep a
+        persistent tkinter root open. Instead, each time Settings is
+        requested we spin up a SHORT-LIVED background thread with its
+        own `tk.Tk()` root; when the window closes, that thread ends."""
+        if self._settings_thread is not None and self._settings_thread.is_alive():
+            # Zaten acik/aciliyor -- ikinci bir tane baslatma.
+            return
+
+        def _run():
+            try:
+                local_root = tk.Tk()
+                local_root.withdraw()
+
+                from settings_gui import SettingsWindow
+
+                config_path = (
+                    self.service.config_path if self.service.config else DEFAULT_CONFIG_PATH
+                )
+                win = SettingsWindow(
+                    local_root, config_path, self._lang(), on_saved=self._on_settings_saved
+                )
+                win.deiconify()
+                win.lift()
+                win.focus_force()
+                win.attributes("-topmost", True)
+                win.after(300, lambda: win.attributes("-topmost", False))
+                # Pencere kapatildiginda (X'e basildiginda) bu thread'in
+                # kendi mainloop'unu sonlandir, boylece thread dogal olarak
+                # biter.
+                win.bind(
+                    "<Destroy>",
+                    lambda e: local_root.quit() if e.widget is win else None,
+                )
+                local_root.mainloop()
+                local_root.destroy()
+            except Exception:
+                import traceback
+
+                self._log_settings_error(traceback.format_exc())
+
+        self._settings_thread = threading.Thread(target=_run, daemon=True)
+        self._settings_thread.start()
 
     def _show_settings_window(self):
         try:
@@ -298,32 +339,54 @@ class TrayApplication:
             menu=self.build_menu(),
         )
 
+        # macOS'ta pystray'in Cocoa/NSStatusItem arka ucu tepsi simgesinin
+        # ANA THREAD'de calismasini gerektiriyor; tkinter'in Aqua arka ucu
+        # da ayni thread'i istiyor. Bu yuzden Windows/Linux'ta persistent
+        # (surekli acik, gizli) bir tkinter koku tutarken, macOS'ta HIC
+        # persistent root olusturmuyoruz -- Ayarlar penceresi istek
+        # uzerine ayri bir thread'de aciliyor (bkz.
+        # _show_settings_window_macos_on_demand). Ayrinti icin
+        # platform_backend/macos.py::run_app'teki uyariya bakin.
+        #
+        # On macOS, pystray's Cocoa/NSStatusItem backend requires the
+        # tray icon to run on the MAIN thread; tkinter's Aqua backend
+        # wants the same thread. So while Windows/Linux keep a
+        # persistent (hidden) tkinter root, macOS creates NO persistent
+        # root at all -- the Settings window is opened on-demand in a
+        # separate thread instead (see
+        # _show_settings_window_macos_on_demand). See the warning in
+        # platform_backend/macos.py::run_app for details.
+        use_persistent_root = platform.system() != "Darwin"
+
         tk_ready = False
         if tk is not None:
-            try:
-                # "Ayarlar" penceresini acabilmek icin, tepsi simgesini AYRI
-                # bir thread'de ("detached") calistirip, tkinter'in kendi
-                # ana dongusunu (mainloop) bu (ana) thread'de calistiriyoruz
-                # -- tkinter widget'lari yalnizca kendi ana thread'inden
-                # olusturulabildigi/degistirilebildigi icin bu gerekli.
-                self.root = tk.Tk()
-                self.root.withdraw()
+            if use_persistent_root:
+                try:
+                    # "Ayarlar" penceresini acabilmek icin, tepsi simgesini
+                    # AYRI bir thread'de ("detached") calistirip, tkinter'in
+                    # kendi ana dongusunu (mainloop) bu (ana) thread'de
+                    # calistiriyoruz -- tkinter widget'lari yalnizca kendi
+                    # ana thread'inden olusturulabildigi/degistirilebildigi
+                    # icin bu gerekli.
+                    self.root = tk.Tk()
+                    self.root.withdraw()
+                    tk_ready = True
+                except Exception:
+                    # tkinter modulu var ama Tcl/Tk kurulumu bozuk/eksik
+                    # olabilir (ozellikle bazi minimal Python dagitimlarinda,
+                    # ya da .exe paketlemesinde). Bu durumda "Ayarlar" yerine
+                    # eski "config.yaml'i editorde ac" davranisina donuyoruz.
+                    self.root = None
+            else:
+                # macOS: root'u kasten olusturmuyoruz (yukaridaki notu
+                # oku); yine de tkinter kullanilabilir oldugu icin
+                # "Ayarlar" menusu on-demand yol ile calisacak.
                 tk_ready = True
-            except Exception:
-                # tkinter modulu var ama Tcl/Tk kurulumu bozuk/eksik
-                # olabilir (ozellikle bazi minimal Python dagitimlarinda,
-                # ya da .exe paketlemesinde). Bu durumda "Ayarlar" yerine
-                # eski "config.yaml'i editorde ac" davranisina donuyoruz.
-                self.root = None
 
         if not tk_ready and self.service.logger:
             self.service.logger.info(t(lang, "tkinter_unavailable"))
 
-        if tk_ready:
-            self.icon.run_detached()
-            self.root.mainloop()
-        else:
-            self.icon.run()
+        backend.run_app(self.icon, self.root)
 
 
 def main():

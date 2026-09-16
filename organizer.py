@@ -272,6 +272,9 @@ def resolve_destination(template: str, when: Optional[datetime] = None) -> Path:
 # Kural motoru
 # ---------------------------------------------------------------------------
 
+PERMISSION_CANARY_NAME = ".organizer_permission_canary"
+
+
 def find_matching_rule(file_path: Path, rules: list) -> Optional[Rule]:
     for rule in rules:
         if rule.matches(file_path):
@@ -330,6 +333,18 @@ def process_file(path: Path, config: Config, logger: logging.Logger) -> Optional
     Tasinan yeni yolu (ya da islem yapilmadiysa None) doner."""
 
     if not path.is_file():
+        return None
+
+    # Sessiz izin hatasi kontrolunun kendi kanarya dosyasi -- kullanicinin
+    # ignore_extensions ayarindan BAGIMSIZ olarak her zaman yok sayilir,
+    # boylece OrganizerService._run_permission_canary ile ana olay
+    # isleyicisi arasinda yaris durumu / gereksiz log kaydi olusmaz.
+    #
+    # The permission-canary's own file -- always ignored regardless of
+    # the user's ignore_extensions setting, so there's no race /
+    # spurious log entry between OrganizerService._run_permission_canary
+    # and the main event handler.
+    if path.name == PERMISSION_CANARY_NAME:
         return None
 
     name_lower = path.name.lower()
@@ -546,6 +561,68 @@ class OrganizerService:
             self.observer = Observer()
             self.observer.schedule(handler, str(self.config.watch_folder), recursive=False)
             self.observer.start()
+
+            # Sessiz izin hatasi kontrolu: ozellikle macOS'ta bir klasore
+            # (Downloads gibi TCC korumali konumlar) izin verilmediginde
+            # genelde hicbir hata FIRLAMAZ -- gozlemci "basarili" sekilde
+            # baslar ama hicbir olay hic gelmez. Arka planda, kisa bir
+            # sure sonra izlenen klasorde bir 'kanarya' dosyasi olusturup
+            # silerek olayin gercekten yakalanip yakalanmadigini kontrol
+            # ediyoruz; yakalanmazsa logger'a bir uyari yaziyoruz.
+            #
+            # Silent permission failure guard: especially on macOS, when
+            # an app lacks permission for a TCC-protected folder like
+            # Downloads, nothing usually throws -- the observer "starts"
+            # successfully but no events ever arrive. In the background,
+            # shortly after starting, we create-then-delete a 'canary'
+            # file in the watched folder to check whether the event is
+            # actually caught; if not, we log a warning.
+            threading.Thread(target=self._run_permission_canary, daemon=True).start()
+
+    def _run_permission_canary(self):
+        if self.config is None:
+            return
+        canary_name = PERMISSION_CANARY_NAME
+        canary_path = self.config.watch_folder / canary_name
+        canary_event = threading.Event()
+
+        class _CanaryHandler(FileSystemEventHandler):
+            def on_created(self, event):
+                if Path(event.src_path).name == canary_name:
+                    canary_event.set()
+
+            def on_moved(self, event):
+                if Path(event.dest_path).name == canary_name:
+                    canary_event.set()
+
+        canary_observer = Observer()
+        caught = True
+        try:
+            canary_observer.schedule(
+                _CanaryHandler(), str(self.config.watch_folder), recursive=False
+            )
+            canary_observer.start()
+            canary_path.write_text("")
+            caught = canary_event.wait(timeout=3.0)
+        except Exception:
+            # Kontrolun kendisi basarisiz olduysa, olmayan bir soruna
+            # dair yanlis alarm vermemek icin sessizce gec.
+            caught = True
+        finally:
+            try:
+                canary_observer.stop()
+                canary_observer.join(timeout=2)
+            except Exception:
+                pass
+            try:
+                if canary_path.exists():
+                    canary_path.unlink()
+            except Exception:
+                pass
+
+        if not caught and self.logger is not None:
+            lang = self.config.language if self.config else "tr"
+            self.logger.warning(t(lang, "permission_warning"))
 
     def stop(self):
         with self._lock:

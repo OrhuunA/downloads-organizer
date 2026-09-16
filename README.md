@@ -26,11 +26,19 @@ Hem tepsi menüsü hem log mesajları Türkçe veya İngilizce olarak
 - `theme.py` — Ayarlar penceresinin açık/koyu (light/dark) tema desteği
 - `i18n.py` — Türkçe/İngilizce arayüz metinleri
 - `autostart.py` — "Bilgisayar Açılışında Başlat" özelliği (Windows/macOS/Linux)
+- `platform_backend/` — Windows/macOS/Linux'a özel kodun (otomatik
+  başlatma, dosya açma, tema tespiti, ana uygulama döngüsü) toplandığı
+  paket — bkz. aşağıdaki "macOS desteği" bölümü
 - `config.yaml` — kurallarınız (dilediğiniz gibi düzenleyin)
 - `requirements.txt` — gerekli Python paketleri
 - `build_exe.bat` — programı **Python gerektirmeyen tek bir .exe** dosyasına
   dönüştürüp başkalarıyla paylaşmanızı sağlayan Windows betiği
 - `app_icon.ico` — .exe dosyasının simgesi
+- `build_app.sh` — programı **Python gerektirmeyen bir .app** paketine
+  dönüştürüp başkalarıyla paylaşmanızı sağlayan macOS betiği (SADECE
+  macOS'ta çalıştırılır)
+- `make_icns.py` — `app_icon.ico`'dan macOS `.app` simgesi (`.icns`)
+  üreten yardımcı betik; `build_app.sh` tarafından otomatik çağrılır
 - `test_organizer.py` — mantığı sahte bir klasörle test eden betik (opsiyonel)
 
 ## Kurulum
@@ -168,6 +176,101 @@ derliyor — ikisi de yanlış alarm oranını ciddi şekilde düşürüyor,
   zaman bu tür bir uyarıya takılmaz, çünkü ortada paketlenmiş bir
   `.exe` yoktur.
 
+## macOS desteği
+
+Program artık macOS'ta da (menü çubuğu simgesi + Ayarlar penceresi +
+bilgisayar açılışında otomatik başlatma dahil) tam işlevsel çalışacak
+şekilde tasarlandı. Windows/Linux'a özel hiçbir kod değiştirilmedi;
+platforma özel tüm mantık `platform_backend/` paketinde toplandı.
+
+**Not:** Bu portu geliştirirken elimde gerçek bir Mac yoktu, bu yüzden
+kod incelemeyle ve mantık yürüterek yazıldı; **gerçek bir Mac'te
+doğrulanana kadar %100 garantili değildir.** Menü çubuğu simgesinin
+görünüp görünmediğini, Ayarlar penceresinin açılıp kapandığını ve
+otomatik başlatmanın çalıştığını test edip bana bildirirseniz
+sevinirim.
+
+### Kaynaktan çalıştırma
+
+```bash
+cd downloads-organizer
+python3 -m pip install -r requirements.txt
+python3 tray_app.py
+```
+
+Sisteminizin Python'ı `tkinter` içermiyorsa (macOS'un kendi Python'ında
+bazen eksik olabiliyor), önce şunlardan birini yapın:
+
+- [python.org](https://www.python.org/downloads/macos/) üzerinden
+  resmi Python kurulumunu kullanın (tkinter dahildir), **veya**
+- Homebrew kullanıyorsanız: `brew install python-tk`
+
+(macOS'un sistemle gelen Tcl/Tk sürümü eski ve bazı görsel sorunlara
+yol açabiliyor; yukarıdaki iki seçenek de daha güncel bir Tcl/Tk
+kullanır.)
+
+### Standalone .app Oluşturma (Python gerektirmeden paylaşma)
+
+Windows'taki `build_exe.bat`'e paralel bir betik:
+
+```bash
+cd downloads-organizer
+chmod +x build_app.sh   # bir kere
+./build_app.sh
+```
+
+Bu betik **SADECE macOS'ta çalışır** (PyInstaller cross-compile
+yapamadığı için Windows/Linux'tan bir `.app` üretilemez). Bittiğinde:
+
+- `dist/İndirilenlerDüzenleyici.app` — çift tıklayıp çalıştırabileceğiniz
+  uygulama paketi
+- `dist/IndirilenlerDuzenleyici-macOS.zip` — başkalarıyla paylaşmaya
+  hazır zip
+
+Apple Silicon (M1/M2/…) bir Mac'te derlerseniz sonuç yalnızca Apple
+Silicon Mac'lerde çalışır (Intel Mac'te çalışmayabilir) — şu an
+`universal2` hedeflenmiyor, çünkü tüm bağımlılıkların (`pystray`,
+`watchdog`, `Pillow` vb.) `universal2` bir tekerlek (wheel) sunması
+gerekirdi, bu aşamada pratik değil.
+
+### macOS Gatekeeper uyarısı
+
+Ücretli bir Apple Developer sertifikamız olmadığı için `.app` yalnızca
+**ad-hoc** (kimliksiz) imzalanıyor. Bu yüzden `.app`'i ilk açtığınızda
+(ya da indirdiğinizde) macOS'un Gatekeeper'ı "geliştirici doğrulanamadı"
+gibi bir uyarı gösterebilir. Çözümü:
+
+1. **Sağ tıklayın** (ya da Control+tıklayın) `İndirilenlerDüzenleyici.app`'e,
+   menüden **"Aç"**'ı seçin, açılan uyarı penceresinde tekrar **"Aç"**'a
+   basın. (Çift tıklamak bu uyarıyı ATLATMAZ, sadece sağ tık → Aç
+   çalışır — bu Apple'ın kasıtlı bir güvenlik davranışı.)
+2. Ya da terminalde karantina işaretini kaldırın:
+   ```bash
+   xattr -dr com.apple.quarantine /path/to/İndirilenlerDüzenleyici.app
+   ```
+
+Bu adımlar yalnızca **ilk açılışta** gerekir.
+
+### macOS'a özel notlar
+
+- Menü çubuğu simgesi görünür ama **Dock'ta hiçbir simge/uygulama
+  görünmez** (`Info.plist`'teki `LSUIElement` ayarı sayesinde) — bu
+  kasıtlıdır, "arka planda çalışan sessiz bir araç" davranışı içindir.
+- **Bilgisayar Açılışında Başlat** menü seçeneği, macOS'ta
+  `~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist` adıyla bir
+  LaunchAgent oluşturur (Windows'taki kayıt defteri girdisinin
+  karşılığı) — elle bir şey yapmanız gerekmez.
+- macOS bazı klasörlere (özellikle `Downloads`) erişimi "Gizlilik ve
+  Güvenlik" ayarları üzerinden kontrol eder. Program, izlenen
+  klasördeki değişiklikleri gerçekten yakalayıp yakalayamadığını arka
+  planda kısa bir "kanarya dosyası" testiyle kontrol eder; bir sorun
+  tespit ederse log dosyasına (**Logları Aç**) bir uyarı yazar ve sizi
+  **Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve Klasörler**'e
+  yönlendirir.
+- Ekran görüntüsü şu an eklenemedi (bende test edebileceğim bir Mac
+  yok) — siz test ederken bir ekran görüntüsü paylaşırsanız buraya
+  eklerim.
+
 ## Dil (Türkçe / İngilizce)
 
 `config.yaml` dosyasının en üstünde:
@@ -263,7 +366,10 @@ kullanabilirsiniz:
 
 ### macOS (elle kurulum)
 
-`~/Library/LaunchAgents/com.orhun.downloadsorganizer.plist` adıyla
+Yukarıdaki "Bilgisayar Açılışında Başlat" menü seçeneği zaten tam
+olarak aşağıdakini kendisi yapıyor — bunu yalnızca o seçenek bir
+sebeple çalışmazsa kullanın.
+`~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist` adıyla
 aşağıdaki içerikte bir dosya oluşturun (yolları kendinize göre
 düzenleyin):
 
@@ -273,14 +379,13 @@ düzenleyin):
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.orhun.downloadsorganizer</string>
+  <key>Label</key><string>com.indirilenlerduzenleyici</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
     <string>/Users/KULLANICI_ADINIZ/downloads-organizer/tray_app.py</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
 </dict>
 </plist>
 ```
@@ -288,7 +393,7 @@ düzenleyin):
 Sonra terminalde:
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.orhun.downloadsorganizer.plist
+launchctl load ~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist
 ```
 
 ### Linux (elle kurulum)
@@ -376,11 +481,19 @@ menu and the log messages can run in Turkish or English (see the
 - `theme.py` — light/dark theme support for the Settings window
 - `i18n.py` — Turkish/English interface strings
 - `autostart.py` — the "Start at Computer Login" feature (Windows/macOS/Linux)
+- `platform_backend/` — the package where all Windows/macOS/Linux-specific
+  code lives (autostart, opening files, theme detection, the main app
+  loop) — see "macOS support" below
 - `config.yaml` — your rules (edit freely)
 - `requirements.txt` — required Python packages
 - `build_exe.bat` — a Windows script that packages the app into a **single
   .exe that needs no Python install**, for sharing with other people
 - `app_icon.ico` — the icon used for that .exe
+- `build_app.sh` — a macOS script that packages the app into a **.app
+  bundle that needs no Python install**, for sharing with other people
+  (runs on macOS ONLY)
+- `make_icns.py` — a helper script that builds the macOS app icon
+  (`.icns`) from `app_icon.ico`; called automatically by `build_app.sh`
 - `test_organizer.py` — a script that tests the logic against a fake folder (optional)
 
 ## Setup
@@ -512,6 +625,99 @@ though; if you still see a warning:
   this kind of warning at all, since there's no packaged `.exe`
   involved.
 
+## macOS support
+
+The app is now designed to be fully functional on macOS too (menu bar
+icon, Settings window, and start-at-login included). No Windows/Linux
+code was changed — all platform-specific logic was moved into the
+`platform_backend/` package.
+
+**Note:** this port was written without access to real Mac hardware —
+it was built by careful code reading and reasoning, so **it isn't
+guaranteed correct until verified on a real Mac.** If you test it and
+can confirm the menu bar icon shows up, the Settings window opens and
+closes properly, and start-at-login works, I'd appreciate hearing
+about it.
+
+### Running from source
+
+```bash
+cd downloads-organizer
+python3 -m pip install -r requirements.txt
+python3 tray_app.py
+```
+
+If your Python doesn't include `tkinter` (sometimes missing from
+macOS's bundled Python), first do one of:
+
+- use the official installer from
+  [python.org](https://www.python.org/downloads/macos/) (tkinter is
+  included), **or**
+- if you use Homebrew: `brew install python-tk`
+
+(macOS's system Tcl/Tk is old and can cause some visual glitches;
+both options above use a more current Tcl/Tk.)
+
+### Building a Standalone .app (share it without Python)
+
+A script that parallels `build_exe.bat` on the Windows side:
+
+```bash
+cd downloads-organizer
+chmod +x build_app.sh   # once
+./build_app.sh
+```
+
+This script **only runs on macOS** (PyInstaller can't cross-compile,
+so a `.app` can't be built from Windows/Linux). When it finishes:
+
+- `dist/İndirilenlerDüzenleyici.app` — the app bundle, double-click to run
+- `dist/IndirilenlerDuzenleyici-macOS.zip` — a zip ready to share with
+  other people
+
+If you build on Apple Silicon (M1/M2/…), the result will only run on
+Apple Silicon Macs (it may not run on an Intel Mac) — `universal2`
+isn't targeted right now, since that would require every dependency
+(`pystray`, `watchdog`, `Pillow`, etc.) to ship a `universal2` wheel,
+which isn't practical at this stage.
+
+### macOS Gatekeeper warning
+
+Since we don't have a paid Apple Developer certificate, the `.app` is
+only signed **ad-hoc** (identity-less). Because of that, the first
+time you open it (or download it), macOS's Gatekeeper may show a
+warning like "developer cannot be verified". To get past it:
+
+1. **Right-click** (or Control-click) `İndirilenlerDüzenleyici.app`,
+   choose **"Open"** from the menu, then click **"Open"** again in the
+   dialog that appears. (Double-clicking does NOT bypass this warning —
+   only right-click → Open works; this is intentional Apple security
+   behavior.)
+2. Or clear the quarantine flag from a terminal:
+   ```bash
+   xattr -dr com.apple.quarantine /path/to/İndirilenlerDüzenleyici.app
+   ```
+
+These steps are only needed the **first time** you open it.
+
+### macOS-specific notes
+
+- The menu bar icon shows up, but **no icon/app appears in the Dock**
+  (thanks to the `LSUIElement` setting in `Info.plist`) — this is
+  intentional, matching a "quiet background tool" behavior.
+- The **Start at Computer Login** menu item creates a LaunchAgent on
+  macOS at `~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist`
+  (the macOS equivalent of the Windows Registry entry) — no manual
+  steps needed.
+- macOS controls access to certain folders (especially `Downloads`)
+  through its Privacy & Security settings. The app runs a short
+  background "canary file" check to verify it's actually catching
+  changes in the watched folder; if it detects a problem, it logs a
+  warning (see **Open Logs**) pointing you to **System Settings →
+  Privacy & Security → Files and Folders**.
+- No screenshot yet (I don't have a Mac to test on) — if you share one
+  after testing, I'll add it here.
+
 ## Language (Turkish / English)
 
 At the top of `config.yaml`:
@@ -600,8 +806,10 @@ use the manual steps below instead.
 
 ### macOS (manual setup)
 
-Create a file named
-`~/Library/LaunchAgents/com.orhun.downloadsorganizer.plist` with this
+The "Start at Computer Login" tray menu item above already does
+exactly this for you — only use this if that option doesn't work for
+some reason. Create a file named
+`~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist` with this
 content (adjust the paths):
 
 ```xml
@@ -610,14 +818,13 @@ content (adjust the paths):
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.orhun.downloadsorganizer</string>
+  <key>Label</key><string>com.indirilenlerduzenleyici</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
     <string>/Users/YOUR_USERNAME/downloads-organizer/tray_app.py</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
 </dict>
 </plist>
 ```
@@ -625,7 +832,7 @@ content (adjust the paths):
 Then in a terminal:
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.orhun.downloadsorganizer.plist
+launchctl load ~/Library/LaunchAgents/com.indirilenlerduzenleyici.plist
 ```
 
 ### Linux (manual setup)

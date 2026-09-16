@@ -83,6 +83,13 @@ STRINGS = {
         "theme_mode_auto": "🖥️ Tema: Otomatik",
         "theme_mode_light": "☀️ Tema: Açık",
         "theme_mode_dark": "🌙 Tema: Koyu",
+        "permission_warning": (
+            "UYARI: İzlenen klasördeki değişiklikler yakalanamıyor gibi "
+            "görünüyor (izin sorunu olabilir). macOS kullanıyorsanız: "
+            "Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve "
+            "Klasörler bölümünden bu uygulamaya izin verildiğinden emin "
+            "olun."
+        ),
     },
     "en": {
         "app_name": "Downloads Organizer",
@@ -153,6 +160,12 @@ STRINGS = {
         "theme_mode_auto": "🖥️ Theme: Auto",
         "theme_mode_light": "☀️ Theme: Light",
         "theme_mode_dark": "🌙 Theme: Dark",
+        "permission_warning": (
+            "WARNING: changes in the watched folder don't seem to be "
+            "detected (this may be a permissions issue). On macOS: check "
+            "System Settings → Privacy & Security → Files and Folders "
+            "and make sure this app is allowed access."
+        ),
     },
 }
 

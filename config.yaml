@@ -49,6 +49,7 @@ ignore_extensions:
   - ".tmp"
   - ".download"     # Safari indirme sırasında
   - ".opdownload"   # Opera
+  - ".ds_store"     # macOS Finder'ın oluşturduğu .DS_Store dosyaları
 
 # Bir dosyanın "indirme bitti, taşınabilir" sayılması için boyutunun
 # kaç saniye değişmeden sabit kalması gerektiği.
