@@ -1,0 +1,40 @@
+# Uc platformda da (Windows/macOS/Linux) organizer mantiginin bozulmadigini
+# dogrulayan basit bir CI is akisi. test_organizer.py GUI/tepsi simgesi
+# kullanmadigi icin (sadece organizer.py'yi test eder), her platformda
+# ekstra bir sistem bagimliligina gerek yoktur.
+#
+# A simple CI workflow that verifies the organizer logic still works on
+# all three platforms (Windows/macOS/Linux). test_organizer.py doesn't
+# use the GUI/tray icon (it only tests organizer.py), so no extra system
+# dependency is needed on any platform.
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout / Kodu al
+        uses: actions/checkout@v4
+
+      - name: Set up Python / Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies / Bagimliliklari kur
+        run: python -m pip install -r requirements.txt
+
+      - name: Run organizer tests / Organizer testlerini calistir
+        run: python test_organizer.py
